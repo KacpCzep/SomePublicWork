@@ -1,0 +1,55 @@
+# 03.02.2026 - Local Root CA. Since this Docker and it's Vaultwarden were migrated into different solutions, any information here is not relevant anymore.
+
+
+
+klucz CA
+openssl genpkey -algorithm RSA -aes128 -out private-ca.key -outform PEM -pkeyopt rsa_keygen_bits:2048
+tworzymy passphrase
+
+generujemy cert root (public) -> dałem Common name DOCKER
+openssl req -x509 -new -nodes -sha256 -days 1460 -key private-ca.key -out self-signed-ca-cert.crt
+
+generujemy klucz dla certyfikatu Vaultwarden
+openssl genpkey -algorithm RSA -out vaultwarden.key -outform PEM -pkeyopt rsa_keygen_bits:2048
+
+teraz csr - Common Name to IP serwera, reszta kropki
+openssl req -new -key vaultwarden.key -out vaultwarden.csr
+mamy vaultwarden.csr
+
+tworzymy (adres ip serwera to ten podany wcześniej)
+nano vaultwarden.ext
+
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+[alt_names]
+IP.1 = [adres ip serwera]
+
+---
+Ostatnie to utworzenie crt
+openssl x509 -req -in vaultwarden.csr -CA self-signed-ca-cert.crt -CAkey private-ca.key -CAcreateserial -out vaultwarden.crt -days 90 -sha256 -extfile vaultwarden.ext
+
+przenieśmy teraz klucze
+sudo mv vaultwarden.crt vaultwarden.key /etc/ssl/certs
+
+pozostałe pliki wrzucmy do nowego katalogu
+sudo mkdir /etc/ssl/CA
+sudo mv vaultwarden.csr vaultwarden.ext private-ca.key self-signed-ca-cert.crt self-signed-ca-cert.srl /etc/ssl/CA
+
+modyfikujemy teraz yaml - environm
+			 - volumes: - '/etc/ssl/certs:/ssl'
+
+Cert trzeba przerzucić na wszystkie urządzenia
+
+AKTUALIZACJA PO 3 MIES, PODMIANA KLUCZY:
+Z POZIOMU /etc/ssl/CA:
+openssl x509 -req -in vaultwarden.csr -CA self-signed-ca-cert.crt -CAkey private-ca.key -CAcreateserial -out vaultwarden.crt -days 365 -sha256 -extfile vaultwarden.ext
+
+mv vaultwarden.crt ../certs/vaultwarden.crt
+
+Teraz należy zaktualizować certyfikat ->
+NIE DZIAŁA: update-ca-certificates
+DZIAŁA: systemctl restart docker.service
