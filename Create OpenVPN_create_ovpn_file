@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# 03.02.2026 - since OpenVPN is not used anymore (in my setup; also, VMs don't exist), script can be safely published.
+
+# Script combines all client files together as single, .ovpn file
+# Use "set -x" for debbuging and "man echo" for more information
+
+
+KEYS=/etc/openvpn/client/keys
+CERTS=/etc/openvpn/client/keys/Clients_certificates
+PRIVATE_KEYS=/etc/easy-rsa/pki/private
+DEFAULT_CLIENT_CONFIG=/etc/openvpn/client/configs/default-client.conf
+CLIENT_OVPN_FILE=/etc/openvpn/client/ovpn-files
+
+# If none or more than 1 arguments were given, print information about needed data
+if [ $# -ne 1 ] ; then
+        echo "FAILED: Use proper OpenVPN req name as first (and only) argument to create .ovpn file."
+        exit 1
+fi
+
+# Check if given argument files (cert and key) exist in proper folder - if TRUE, continue
+if find $CERTS -iname ${1}.crt | grep -q . && \
+   find $PRIVATE_KEYS -iname ${1}.key | grep -q . ; then
+                echo "SUCCESS: Certificate found in proper folder -" $KEYS
+                echo "SUCCESS: Private key found found in proper folder -" $PRIVATE_KEYS
+                echo "Creating file..."
+        else
+                echo 'FAILED: Certificate or key not found in proper folders.'
+                echo 'Crt -' $KEYS 'and private key -' $PRIVATE_KEYS
+                exit 1
+fi
+
+cat ${DEFAULT_CLIENT_CONFIG} <(echo '<ca>') ${KEYS}/RootCA.crt <(echo -e '</ca>\n<cert>') ${CERTS}/${1}.crt <(echo -e '</cert>\n<key>') \
+    ${PRIVATE_KEYS}/${1}.key <(echo -e '</key>\n<tls-auth>') ${KEYS}/ta.key <(echo '</tls-auth>') \
+    > ${CLIENT_OVPN_FILE}/${1}.ovpn
+
+echo "SUCCESS: Client .ovpn file created succesfully in /etc/openvpn/client/ovpn-files"
+cp ${CLIENT_OVPN_FILE}/${1}.ovpn /tmp
+echo ".ovpn file is accessible in /tmp directory. If machine was rebooted or file is not present, follow 'OVPN-help' command"
