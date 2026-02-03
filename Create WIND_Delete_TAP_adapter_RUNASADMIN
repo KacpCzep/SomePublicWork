@@ -1,0 +1,23 @@
+::@echo off
+setlocal enabledelayedexpansion
+
+:: Create files where the script was run (so pendrive!). Without it, while running as admin, we won't file those below in the /system32 dir
+set only_TAP_info=%~dp0only_TAP_info.txt
+set pnp_all_drivers=%~dp0pnp_all_drivers.txt
+
+:: Write all info about drivers to file for further processing
+pnputil /enum-devices > %pnp_all_drivers%
+
+:: Get-Content and Pattern looks for TAP-Windows -> OpenVPN adapter. We need the second line after the name, so it needs to be only cut to three lines (in [0] is looked up name, in [2] is driver's name)
+:: Saving to file without UTF8 leds to different format which segments string e.g. T A P - W I N D O W S
+powershell -Command "Get-Content %pnp_all_drivers% | Select-String -Pattern 'TAP-Windows Provider' -Context 0,2 | Out-File -FilePath %only_TAP_info% -Encoding UTF8"
+for /f "tokens=1,2 delims=:" %%a in ('findstr /R /C:"Driver Name" %only_TAP_info%') do (
+	set TAP_interface=%%b
+	set TAP_interface=!TAP_interface:~16!
+)
+:: Delayed var in loop gets the driver's name, but it needs to be shortened (there are always 16 'spaces' in front so we start from [16]th sign)
+pnputil /delete-driver %TAP_interface% /uninstall /force
+
+del %~dp0only_TAP_info.txt
+del %~dp0pnp_all_drivers.txt
+pause
