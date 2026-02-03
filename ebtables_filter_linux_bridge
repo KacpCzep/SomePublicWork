@@ -1,0 +1,71 @@
+#! /bin/sh
+
+# 03.02.2026 - _IP1_, _IP2_ and _MAC1_ are corresponding original values  intentionally changed for publishing purposes
+# Scenario - separation between Proxmox VMs
+
+# Created 25.06.2024
+# Author: Kacper Czepiec
+
+# On system start, case do_drop drops all data to easyRSA machine (via crontab)
+# If do_allow, accept only openVPN machine to exchange data with easyRSA machine (requests and certs). It will be dropped by cron every few minutes
+
+# Default access to easyRSA is via Proxmox and Proxmox only
+# Default bridge rules are ACCPET
+
+# Without path, cron cannot find commands like ebtables etc.
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+do_drop()
+{
+        ebtables -F
+        # Fully drop traffic to easyRSA
+        # Separate rules for IP and MAC addresses, because combining them in one rules acts as AND logical operation
+        # We want to drop them as OR, in case IP/MAC changes
+        ebtables -t filter -A FORWARD -p IPv4 -s _MAC1_ -j DROP
+        ebtables -t filter -A FORWARD -p IPv4 -d _MAC1_ -j DROP
+        ebtables -t filter -A FORWARD -p IPv4 --ip-src _IP1_ -j DROP
+        ebtables -t filter -A FORWARD -p IPv4 --ip-dst _IP1_ -j DROP
+}
+
+
+
+do_allow()
+{
+        # Dropping any of below ACCEPT rule will result in communication fail between _IP1_ and _IP2_
+        ebtables -F
+        ebtables -t filter -A FORWARD -p IPv4 --ip-src _IP1_ --src _MAC1_ --ip-dst  _IP2_ -j ACCEPT
+        ebtables -t filter -A FORWARD -p IPv4 --ip-dst _IP1_ --dst _MAC1_ --ip-src  _IP2_ -j ACCEPT
+        ebtables -t filter -A FORWARD -p IPv4 -s _MAC1_ -j DROP
+        ebtables -t filter -A FORWARD -p IPv4 -d _MAC1_ -j DROP
+        ebtables -t filter -A FORWARD -p IPv4 --ip-src _IP1_ -j DROP
+        ebtables -t filter -A FORWARD -p IPv4 --ip-dst _IP1_ -j DROP
+
+}
+
+do_status()
+{
+        echo "--- FILTER ---\n"
+        ebtables -t filter -L
+        echo "--- NAT ---\n"
+        ebtables -t nat -L
+        echo "--- BROUTE ---\n"
+        ebtables -t broute -L
+}
+
+case "$1" in
+        drop)
+           do_drop
+           ;;
+        allow)
+           do_allow
+           ;;
+        status)
+           do_status
+           ;;
+        *)
+           echo "Usage: $0 {drop|allow|status}"
+           exit 1
+           ;;
+esac
+
+exit 0
