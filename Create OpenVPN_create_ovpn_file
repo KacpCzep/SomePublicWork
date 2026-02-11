@@ -27,7 +27,7 @@ if find $CERTS -iname ${1}.crt | grep -q . && \
         else
                 echo 'FAILED: Certificate or key not found in proper folders.'
                 echo 'Crt -' $KEYS 'and private key -' $PRIVATE_KEYS
-                exit 1
+                exit 2
 fi
 
 cat ${DEFAULT_CLIENT_CONFIG} <(echo '<ca>') ${KEYS}/RootCA.crt <(echo -e '</ca>\n<cert>') ${CERTS}/${1}.crt <(echo -e '</cert>\n<key>') \
