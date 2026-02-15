@@ -106,6 +106,7 @@ cat /etc/apache2/sites-available/000-default.conf
         CustomLog ${APACHE_LOG_DIR}/access.log combined
 		ServerName NAME(URL)
         SSLEngine on
+		SSLOpenSSLConfCmd DHParameters "/etc/ssl/certs/dhparam.pem"
         SSLCertificateFile "/etc/ssl/certs/zabbix.mycompany.internal.crt"
         SSLCertificateKeyFile "/etc/ssl/private/zabbix.mycompany.internal.key"
         DocumentRoot /usr/share/zabbix/ui
