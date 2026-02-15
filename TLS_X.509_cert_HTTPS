@@ -98,7 +98,7 @@ openssl dhparam -out /etc/ssl/certs/dhparam.pem 2048
 cat /etc/apache2/sites-available/000-default.conf
 <VirtualHost *:80>
         ServerName zabbix.evul
-        Redirect / https://zabbix.DOMENA/zabbix
+        Redirect / https://zabbix.DOMENA
 </VirtualHost>
 
 <VirtualHost *:443>
