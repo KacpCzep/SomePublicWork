@@ -53,3 +53,65 @@ mv vaultwarden.crt ../certs/vaultwarden.crt
 Teraz należy zaktualizować certyfikat ->
 NIE DZIAŁA: update-ca-certificates
 DZIAŁA: systemctl restart docker.service
+
+
+----------
+APACHE2 - Zabbix jako przykład (https://blog.zabbix.com/securing-the-zabbix-frontend/27700/)
+
+1. Generate a private key for the CA (Certificate Authority) 
+mkdir ~/ssl    |          cd ~/ssl
+openssl ecparam -out myCA.key -name prime256v1 -genkey
+
+2. Generate a root certificate 
+openssl req -x509 -new -nodes -key myCA.key -sha256 -days 1825 -out myCA.pem
+Common name to np. Adres IP albo FQDN
+
+3. Generate CA-Authenticated Certificates 
+openssl genrsa -out zabbix.mycompany.internal.key 2048 
+
+4. Generate a Certificate Signing Request (CSR) 
+openssl req -new -key zabbix.mycompany.internal.key -out zabbix.mycompany.internal.csr 
+
+5. Generate an X509 V3 certificate extension configuration file 
+nano zabbix.mycompany.internal.ext
+
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+[alt_names]
+IP.1 = X.X.X.X
+#DNS.1 = MYDNS
+
+6. Generate the certificate using our CSR, the CA private key, the CA certificate, and the config file 
+openssl x509 -req -in zabbix.mycompany.internal.csr -CA myCA.pem -CAkey myCA.key \
+-CAcreateserial -out zabbix.mycompany.internal.crt -days 825 -sha256 -extfile zabbix.mycompany.internal.ext
+
+7. Copy the SSL certificates to your Virtual Host
+cp zabbix.mycompany.internal.crt /etc/ssl/certs/. 
+cp zabbix.mycompany.internal.key /etc/ssl/private/.
+
+8. DH params
+openssl dhparam -out /etc/ssl/certs/dhparam.pem 2048
+
+9. Apache2 config
+cat /etc/apache2/sites-available/000-default.conf
+<VirtualHost *:80>
+        ServerName zabbix.evul
+        Redirect / https://zabbix.DOMENA/zabbix
+</VirtualHost>
+
+<VirtualHost *:443>
+		ErrorLog ${APACHE_LOG_DIR}/error.log
+        CustomLog ${APACHE_LOG_DIR}/access.log combined
+		ServerName NAME(URL)
+        SSLEngine on
+        SSLCertificateFile "/etc/ssl/certs/zabbix.mycompany.internal.crt"
+        SSLCertificateKeyFile "/etc/ssl/private/zabbix.mycompany.internal.key"
+        DocumentRoot /usr/share/zabbix/ui
+        <Directory "/usr/share/zabbix">
+        Options FollowSymLinks
+        AllowOverride None
+        Require all granted
+        </Directory>
+</VirtualHost>
